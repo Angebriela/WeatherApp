@@ -32,7 +32,7 @@ export class ForecastError extends Error {
 }
 
 // Busca ciudades y devuelve hasta cinco resultados validados de Open-Meteo.
-export async function searchCities(query) {
+export async function searchCities(query, { signal } = {}) {
   const name = typeof query === "string" ? query.trim() : "";
   if (!name) {
     throw new GeocodingError("input", "Ingresa el nombre de una ciudad para buscar.");
@@ -47,8 +47,12 @@ export async function searchCities(query) {
 
   let response;
   try {
-    response = await fetch(url);
-  } catch {
+    response = await fetch(url, { signal });
+  } catch (error) {
+    if (signal?.aborted || error?.name === "AbortError") {
+      throw new GeocodingError("aborted", "La búsqueda fue cancelada.");
+    }
+
     throw new GeocodingError(
       "network",
       "No se pudo conectar con el servicio de búsqueda. Revisa tu conexión e inténtalo de nuevo.",
@@ -125,7 +129,7 @@ export async function searchCities(query) {
 }
 
 // Solicita el tiempo actual y cuatro días en la zona horaria de las coordenadas recibidas.
-export async function getForecast(latitude, longitude) {
+export async function getForecast(latitude, longitude, { signal } = {}) {
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     throw new ForecastError("input", "La ciudad seleccionada no tiene coordenadas válidas.");
   }
@@ -142,8 +146,12 @@ export async function getForecast(latitude, longitude) {
 
   let response;
   try {
-    response = await fetch(url);
-  } catch {
+    response = await fetch(url, { signal });
+  } catch (error) {
+    if (signal?.aborted || error?.name === "AbortError") {
+      throw new ForecastError("aborted", "La consulta del pronóstico fue cancelada.");
+    }
+
     throw new ForecastError(
       "network",
       "No se pudo conectar con el servicio meteorológico. Revisa tu conexión e inténtalo de nuevo.",

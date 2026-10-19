@@ -69,6 +69,27 @@ export function clearResults() {
   if (resultsEmptyNote) resultsEmptyNote.hidden = true;
 }
 
+// Retira datos meteorológicos anteriores antes de consultar otra ciudad.
+export function clearWeather(message = "Los datos del clima se mostrarán al seleccionar una ciudad.") {
+  currentWeatherValues?.forEach((element) => {
+    element.textContent = "—";
+  });
+  if (currentWeatherEmptyNote) {
+    currentWeatherEmptyNote.textContent = message;
+    currentWeatherEmptyNote.hidden = false;
+  }
+}
+
+// Retira el pronóstico anterior y cualquier aviso de datos incompletos.
+export function clearForecast(message = "El pronóstico aparecerá al seleccionar una ciudad.") {
+  forecastList?.replaceChildren();
+  if (forecastEmptyNote) {
+    forecastEmptyNote.textContent = message;
+    forecastEmptyNote.hidden = false;
+  }
+  if (forecastIncompleteNote) forecastIncompleteNote.hidden = true;
+}
+
 // Renderiza como máximo cinco opciones accesibles sin cambiar el orden recibido.
 export function showResults(results = []) {
   if (!resultsList) return;

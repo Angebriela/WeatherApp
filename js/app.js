@@ -5,9 +5,12 @@ import { getForecast, searchCities } from "./api.js";
 const searchForm = document.querySelector(".search-form");
 const searchInput = document.querySelector("#city-search");
 const resultsList = document.querySelector(".results-list");
-let isSearching = false;
 let currentResults = [];
 let selectedCity = null;
+let geocodingRequestId = 0;
+let geocodingController = null;
+let forecastRequestId = 0;
+let forecastController = null;
 
 // Traduce las categorías de error del servicio en mensajes útiles para el usuario.
 function getSearchErrorMessage(error) {
@@ -25,6 +28,13 @@ function getForecastErrorMessage(error) {
   }
 
   return error?.message || "No se pudo consultar el pronóstico. Inténtalo de nuevo.";
+}
+
+// Cancela el pronóstico anterior e invalida su permiso para actualizar la interfaz.
+function invalidateForecastRequest() {
+  forecastRequestId += 1;
+  forecastController?.abort();
+  forecastController = null;
 }
 
 // Traduce los códigos WMO recibidos por Open-Meteo a descripciones en español.
@@ -122,10 +132,21 @@ function prepareDailyForecast(forecast) {
 
 // Solicita pronóstico para la ciudad elegida y presenta sus datos sin cambiar su selección.
 async function loadSelectedCityForecast(city) {
+  const requestId = ++forecastRequestId;
+  forecastController?.abort();
+  const controller = new AbortController();
+  forecastController = controller;
+
+  ui.clearWeather("Consultando condiciones para la ciudad seleccionada…");
+  ui.clearForecast("Consultando el pronóstico para la ciudad seleccionada…");
   ui.setLoading(true, "Consultando el clima y el pronóstico…");
 
   try {
-    const forecast = await getForecast(city.latitude, city.longitude);
+    const forecast = await getForecast(city.latitude, city.longitude, {
+      signal: controller.signal,
+    });
+    if (requestId !== forecastRequestId || selectedCity !== city) return;
+
     const dailyForecast = prepareDailyForecast(forecast);
 
     ui.showWeather(prepareCurrentWeather(forecast));
@@ -137,16 +158,22 @@ async function loadSelectedCityForecast(city) {
       ui.showMessage(`Clima actualizado para ${city.name}.`);
     }
   } catch (error) {
+    if (requestId !== forecastRequestId || error?.kind === "aborted") return;
+
+    ui.clearWeather("Los datos actuales no están disponibles.");
+    ui.clearForecast("El pronóstico no está disponible.");
     ui.showError(getForecastErrorMessage(error));
   } finally {
-    ui.setLoading(false);
+    if (requestId === forecastRequestId) {
+      if (forecastController === controller) forecastController = null;
+      ui.setLoading(false);
+    }
   }
 }
 
 if (searchForm && searchInput) {
   searchForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (isSearching) return;
 
     const query = searchInput.value.trim();
     if (!query) {
@@ -156,16 +183,26 @@ if (searchForm && searchInput) {
       return;
     }
 
-    isSearching = true;
+    const requestId = ++geocodingRequestId;
+    geocodingController?.abort();
+    const controller = new AbortController();
+    geocodingController = controller;
+
+    invalidateForecastRequest();
     currentResults = [];
     selectedCity = null;
     ui.clearResults();
+    ui.clearWeather();
+    ui.clearForecast();
     ui.showSelectedCity(null);
     ui.setSearchInvalid(false);
     ui.setLoading(true, "Buscando ciudades…");
 
     try {
-      currentResults = (await searchCities(query)).slice(0, 5);
+      const results = await searchCities(query, { signal: controller.signal });
+      if (requestId !== geocodingRequestId) return;
+
+      currentResults = results.slice(0, 5);
       ui.showResults(currentResults);
 
       if (currentResults.length === 0) {
@@ -176,10 +213,14 @@ if (searchForm && searchInput) {
         );
       }
     } catch (error) {
+      if (requestId !== geocodingRequestId || error?.kind === "aborted") return;
+
       ui.showError(getSearchErrorMessage(error));
     } finally {
-      isSearching = false;
-      ui.setLoading(false);
+      if (requestId === geocodingRequestId) {
+        if (geocodingController === controller) geocodingController = null;
+        ui.setLoading(false);
+      }
     }
   });
 
@@ -203,7 +244,7 @@ if (searchForm && searchInput) {
         .filter(Boolean)
         .join(", ")}.`,
     );
-    loadSelectedCityForecast(selectedCity);
+    void loadSelectedCityForecast(selectedCity);
   });
 } else {
   ui.showError("No se encontró el formulario de búsqueda en la página.");
