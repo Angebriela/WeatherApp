@@ -26,7 +26,7 @@ export function showMessage(message) {
 export function setLoading(isLoading, message = "Cargando…") {
   if (statusRegion) statusRegion.setAttribute("aria-busy", String(isLoading));
   if (resultsSection) resultsSection.setAttribute("aria-busy", String(isLoading));
-  showMessage(isLoading ? message : "Escribe una ciudad para comenzar.");
+  if (isLoading) showMessage(message);
 }
 
 // Presenta errores en la región de alerta definida en el documento.
