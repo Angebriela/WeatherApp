@@ -23,9 +23,11 @@ const forecastIncompleteNote = forecastSection
 const favoritesSection = document.querySelector(".favorites-section");
 const favoritesList = document.querySelector(".favorites-list");
 const favoritesEmptyNote = favoritesSection?.querySelector(".empty-note");
+const favoritesHeading = document.querySelector("#favorites-title");
 const favoritesErrorNote = favoritesSection
   ? document.createElement("p")
   : null;
+const weatherSection = document.querySelector(".weather-section");
 
 // Agrega el control para guardar la ciudad elegida sin ampliar el HTML estático.
 if (favoriteSaveButton) {
@@ -42,6 +44,7 @@ if (favoritesErrorNote) {
   favoritesErrorNote.className = "favorites-error-message";
   favoritesErrorNote.setAttribute("role", "alert");
   favoritesErrorNote.setAttribute("aria-live", "assertive");
+  favoritesErrorNote.tabIndex = -1;
   favoritesErrorNote.hidden = true;
   favoritesSection.append(favoritesErrorNote);
 }
@@ -63,9 +66,17 @@ export function showMessage(message) {
 }
 
 // Expone visual y accesiblemente el estado de una operación pendiente.
-export function setLoading(isLoading, message = "Cargando…") {
+export function setLoading(isLoading, message = "Cargando…", operation = "search") {
   if (statusRegion) statusRegion.setAttribute("aria-busy", String(isLoading));
-  if (resultsSection) resultsSection.setAttribute("aria-busy", String(isLoading));
+  if (resultsSection) {
+    resultsSection.setAttribute("aria-busy", String(isLoading && operation === "search"));
+  }
+  if (weatherSection) {
+    weatherSection.setAttribute("aria-busy", String(isLoading && operation === "weather"));
+  }
+  if (forecastSection) {
+    forecastSection.setAttribute("aria-busy", String(isLoading && operation === "weather"));
+  }
   if (isLoading) showMessage(message);
 }
 
@@ -74,6 +85,9 @@ export function showError(message) {
   if (errorMessage) {
     errorMessage.textContent = message;
     errorMessage.hidden = false;
+  }
+  if (statusText) {
+    statusText.textContent = "La operación no pudo completarse. Consulta el mensaje de error.";
   }
   if (statusRegion) statusRegion.setAttribute("aria-busy", "false");
 }
@@ -141,6 +155,7 @@ export function showResults(results = []) {
     const name = document.createElement("strong");
     const location = document.createElement("span");
     const coordinates = document.createElement("span");
+    const selectedText = document.createElement("span");
     const locationDetails = [result.admin1, result.admin2, result.country]
       .filter(Boolean)
       .join(", ");
@@ -160,8 +175,11 @@ export function showResults(results = []) {
     location.textContent = locationDetails || "Región o país no disponible";
     coordinates.className = "city-result-coordinates";
     coordinates.textContent = `Coordenadas: ${result.latitude}, ${result.longitude}`;
+    selectedText.className = "city-result-selected";
+    selectedText.textContent = "Ciudad seleccionada";
+    selectedText.hidden = true;
 
-    button.append(name, location, coordinates);
+    button.append(name, location, coordinates, selectedText);
     item.append(button);
     resultsList.append(item);
   }
@@ -172,6 +190,8 @@ export function setSelectedResult(selectedIndex) {
   resultsList?.querySelectorAll("[data-result-index]").forEach((button) => {
     const isSelected = Number(button.dataset.resultIndex) === selectedIndex;
     button.setAttribute("aria-pressed", String(isSelected));
+    const selectedText = button.querySelector(".city-result-selected");
+    if (selectedText) selectedText.hidden = !isSelected;
   });
 }
 
@@ -197,7 +217,19 @@ export function setFavoriteSaveState(isSaved, storageAvailable) {
 
   favoriteSaveButton.textContent = isSaved ? "Ya está en favoritas" : "Agregar a favoritas";
   favoriteSaveButton.setAttribute("aria-pressed", String(isSaved));
-  favoriteSaveButton.disabled = isSaved || !storageAvailable;
+  favoriteSaveButton.disabled = !storageAvailable;
+}
+
+// Devuelve el foco al área de favoritas tras un error de almacenamiento o eliminación.
+export function focusFavoritesError() {
+  favoritesErrorNote?.focus();
+}
+
+// Ofrece un destino de foco cuando se quita la última favorita.
+export function focusFavoritesHeading() {
+  if (!favoritesHeading) return;
+  favoritesHeading.tabIndex = -1;
+  favoritesHeading.focus();
 }
 
 // Muestra los cinco datos meteorológicos actuales en el orden del HTML.

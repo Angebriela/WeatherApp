@@ -143,8 +143,11 @@ function createFavorite(city) {
 
 // Agrega la ubicación actual solo si no existe ya la misma pareja de coordenadas.
 function saveSelectedCityAsFavorite() {
-  if (!selectedCity || !favoritesAvailable) {
+  if (!selectedCity) return;
+
+  if (!favoritesAvailable) {
     renderFavorites();
+    ui.focusFavoritesError();
     return;
   }
 
@@ -155,6 +158,8 @@ function saveSelectedCityAsFavorite() {
 
   if (persistFavorites([...favorites, createFavorite(selectedCity)])) {
     ui.showMessage(`${selectedCity.name} se agregó a favoritas.`);
+  } else {
+    ui.focusFavoritesError();
   }
 }
 
@@ -171,6 +176,17 @@ function handleFavoriteAction(event) {
     const nextFavorites = favorites.filter((_, favoriteIndex) => favoriteIndex !== index);
     if (persistFavorites(nextFavorites) && removedFavorite) {
       ui.showMessage(`${removedFavorite.name} se quitó de favoritas.`);
+
+      const nextFocusIndex = Math.min(index, favorites.length - 1);
+      if (nextFocusIndex >= 0) {
+        favoritesList
+          ?.querySelector(`[data-favorite-action="remove"][data-favorite-index="${nextFocusIndex}"]`)
+          ?.focus();
+      } else {
+        ui.focusFavoritesHeading();
+      }
+    } else {
+      ui.focusFavoritesError();
     }
     return;
   }
@@ -179,7 +195,7 @@ function handleFavoriteAction(event) {
     selectedCity = favorites[index];
     ui.setSelectedResult(-1);
     ui.showSelectedCity(selectedCity);
-    renderFavorites();
+    ui.setFavoriteSaveState(true, favoritesAvailable);
     ui.showMessage(`Ciudad favorita seleccionada: ${selectedCity.name}.`);
     void loadSelectedCityForecast(selectedCity);
   }
@@ -290,7 +306,7 @@ async function loadSelectedCityForecast(city) {
 
   ui.clearWeather("Consultando condiciones para la ciudad seleccionada…");
   ui.clearForecast("Consultando el pronóstico para la ciudad seleccionada…");
-  ui.setLoading(true, "Consultando el clima y el pronóstico…");
+  ui.setLoading(true, "Consultando el clima y el pronóstico…", "weather");
 
   try {
     const forecast = await getForecast(city.latitude, city.longitude, {
