@@ -6,6 +6,7 @@ const errorMessage = document.querySelector(".error-message");
 const resultsSection = document.querySelector(".results-section");
 const resultsList = document.querySelector(".results-list");
 const resultsEmptyNote = resultsSection?.querySelector(".empty-note");
+const selectedLocationLabel = document.querySelector(".location-label");
 const currentWeather = document.querySelector(".current-weather");
 const currentWeatherEmptyNote = currentWeather?.querySelector(".empty-note");
 const currentWeatherValues = currentWeather?.querySelectorAll(".weather-detail dd");
@@ -49,12 +50,19 @@ export function setSearchInvalid(isInvalid) {
   }
 }
 
-// Renderiza opciones de ciudad como texto seguro, sin agregar selección ni eventos.
+// Limpia resultados anteriores sin confundir la carga de una búsqueda con cero coincidencias.
+export function clearResults() {
+  resultsList?.replaceChildren();
+  if (resultsEmptyNote) resultsEmptyNote.hidden = true;
+}
+
+// Renderiza como máximo cinco opciones accesibles sin cambiar el orden recibido.
 export function showResults(results = []) {
   if (!resultsList) return;
 
   resultsList.replaceChildren();
-  const hasResults = Array.isArray(results) && results.length > 0;
+  const visibleResults = Array.isArray(results) ? results.slice(0, 5) : [];
+  const hasResults = visibleResults.length > 0;
 
   if (resultsEmptyNote) {
     resultsEmptyNote.hidden = hasResults;
@@ -63,24 +71,58 @@ export function showResults(results = []) {
 
   if (!hasResults) return;
 
-  for (const result of results) {
+  for (const [index, result] of visibleResults.entries()) {
     const item = document.createElement("li");
-    const details = [result.name, result.admin1, result.country]
+    const button = document.createElement("button");
+    const name = document.createElement("strong");
+    const location = document.createElement("span");
+    const coordinates = document.createElement("span");
+    const locationDetails = [result.admin1, result.admin2, result.country]
       .filter(Boolean)
       .join(", ");
-    const coordinates = [result.latitude, result.longitude]
-      .every((coordinate) => (
-        coordinate !== undefined
-        && coordinate !== null
-        && coordinate !== ""
-        && Number.isFinite(Number(coordinate))
-      ))
-      ? ` (${result.latitude}, ${result.longitude})`
-      : "";
 
-    item.textContent = `${details || "Ciudad"}${coordinates}`;
+    button.type = "button";
+    button.className = "city-result-button";
+    button.dataset.resultIndex = String(index);
+    button.setAttribute("aria-pressed", "false");
+    button.setAttribute(
+      "aria-label",
+      `Seleccionar ${result.name}${locationDetails ? `, ${locationDetails}` : ""}, coordenadas ${result.latitude}, ${result.longitude}`,
+    );
+
+    name.className = "city-result-name";
+    name.textContent = result.name;
+    location.className = "city-result-location";
+    location.textContent = locationDetails || "Región o país no disponible";
+    coordinates.className = "city-result-coordinates";
+    coordinates.textContent = `Coordenadas: ${result.latitude}, ${result.longitude}`;
+
+    button.append(name, location, coordinates);
+    item.append(button);
     resultsList.append(item);
   }
+}
+
+// Refleja qué resultado está seleccionado tanto visualmente como para lectores de pantalla.
+export function setSelectedResult(selectedIndex) {
+  resultsList?.querySelectorAll("[data-result-index]").forEach((button) => {
+    const isSelected = Number(button.dataset.resultIndex) === selectedIndex;
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+}
+
+// Actualiza la etiqueta de ubicación sin solicitar ni presentar datos meteorológicos.
+export function showSelectedCity(city) {
+  if (!selectedLocationLabel) return;
+
+  if (!city) {
+    selectedLocationLabel.textContent = "Selecciona una ciudad";
+    return;
+  }
+
+  selectedLocationLabel.textContent = [city.name, city.admin1, city.country]
+    .filter(Boolean)
+    .join(", ");
 }
 
 // Muestra los cinco datos meteorológicos actuales en el orden del HTML.
