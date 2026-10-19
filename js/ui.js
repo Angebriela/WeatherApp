@@ -13,9 +13,22 @@ const currentWeatherValues = currentWeather?.querySelectorAll(".weather-detail d
 const forecastSection = document.querySelector(".forecast-section");
 const forecastList = document.querySelector(".forecast-list");
 const forecastEmptyNote = forecastSection?.querySelector(".empty-note");
+const forecastIncompleteNote = forecastSection
+  ? document.createElement("p")
+  : null;
 const favoritesSection = document.querySelector(".favorites-section");
 const favoritesList = document.querySelector(".favorites-list");
 const favoritesEmptyNote = favoritesSection?.querySelector(".empty-note");
+
+// Prepara una región accesible para avisar que el pronóstico tiene datos faltantes.
+if (forecastIncompleteNote) {
+  forecastIncompleteNote.className = "forecast-incomplete-message";
+  forecastIncompleteNote.setAttribute("role", "status");
+  forecastIncompleteNote.setAttribute("aria-live", "polite");
+  forecastIncompleteNote.hidden = true;
+  forecastIncompleteNote.textContent = "El pronóstico está incompleto; se muestran los datos disponibles.";
+  forecastSection.append(forecastIncompleteNote);
+}
 
 // Actualiza el mensaje de estado en una región que tecnologías de asistencia anuncian.
 export function showMessage(message) {
@@ -136,10 +149,6 @@ export function showWeather(weather = {}) {
     weather.windSpeed,
     weather.humidity,
   ];
-  const hasData = fields.some((value) => (
-    value !== undefined && value !== null && value !== ""
-  ));
-
   currentWeatherValues.forEach((element, index) => {
     const value = fields[index];
     element.textContent = value === undefined || value === null || value === ""
@@ -147,16 +156,20 @@ export function showWeather(weather = {}) {
       : String(value);
   });
 
-  if (currentWeatherEmptyNote) currentWeatherEmptyNote.hidden = hasData;
+  if (currentWeatherEmptyNote) currentWeatherEmptyNote.hidden = true;
 }
 
 // Renderiza tarjetas de pronóstico; recibe datos ya preparados por la lógica de aplicación.
-export function showForecast(days = []) {
+export function showForecast(days = [], isIncomplete = false) {
   if (!forecastList) return;
 
   forecastList.replaceChildren();
   const hasDays = Array.isArray(days) && days.length > 0;
   if (forecastEmptyNote) forecastEmptyNote.hidden = hasDays;
+  if (forecastEmptyNote && !hasDays) {
+    forecastEmptyNote.textContent = "No hay datos disponibles para el pronóstico.";
+  }
+  if (forecastIncompleteNote) forecastIncompleteNote.hidden = !isIncomplete;
   if (!hasDays) return;
 
   for (const [index, day] of days.entries()) {
