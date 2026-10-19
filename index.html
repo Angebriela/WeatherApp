@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f7fb">
+    <meta
+      name="description"
+      content="Consulta el clima actual y el pronóstico de una ciudad."
+    >
+    <title>Clima — Weather App</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <script type="module" src="./js/app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="page-shell header-content">
+        <a class="brand" href="./" aria-label="Clima, página de inicio">
+          <span class="brand-mark" aria-hidden="true">☀</span>
+          <span>Clima</span>
+        </a>
+        <p class="header-note">El tiempo de tu ciudad, de un vistazo</p>
+      </div>
+    </header>
+
+    <main class="page-shell page-content">
+      <section class="search-section panel" aria-labelledby="search-title">
+        <div class="section-heading">
+          <p class="eyebrow">Pronóstico local</p>
+          <h1 id="search-title">¿Qué tiempo hace?</h1>
+          <p class="section-description">
+            Busca una ciudad para consultar sus condiciones actuales y los próximos días.
+          </p>
+        </div>
+
+        <!-- Formulario estructural; la búsqueda se conectará en una tarea posterior. -->
+        <form class="search-form" role="search" action="" method="get">
+          <label class="visually-hidden" for="city-search">Nombre de la ciudad</label>
+          <input
+            id="city-search"
+            name="city"
+            type="search"
+            placeholder="Por ejemplo, Ciudad de México"
+            autocomplete="off"
+          >
+          <button class="button button-primary" type="submit">Buscar</button>
+        </form>
+      </section>
+
+      <!-- Región reservada para opciones de geocodificación. -->
+      <section class="panel results-section" aria-labelledby="results-title" aria-live="polite">
+        <div class="section-heading compact-heading">
+          <h2 id="results-title">Resultados de búsqueda</h2>
+        </div>
+        <p class="empty-note">Los resultados de ciudades aparecerán aquí.</p>
+        <ul class="results-list" aria-label="Ciudades encontradas"></ul>
+      </section>
+
+      <!-- Estado accesible compartido para futuras operaciones de carga y error. -->
+      <div class="status-region" role="status" aria-live="polite" aria-atomic="true">
+        <span class="status-indicator" aria-hidden="true"></span>
+        <span>Escribe una ciudad para comenzar.</span>
+      </div>
+      <p class="error-message" role="alert" aria-live="assertive" hidden></p>
+
+      <section class="weather-section" aria-labelledby="weather-title">
+        <div class="section-heading weather-heading">
+          <div>
+            <p class="eyebrow">Condiciones actuales</p>
+            <h2 id="weather-title">Clima actual</h2>
+          </div>
+          <p class="location-label">Selecciona una ciudad</p>
+        </div>
+
+        <!-- Área de datos meteorológicos sin valores de ejemplo ni lógica en T-01. -->
+        <div class="current-weather panel" aria-live="polite">
+          <p class="empty-note">Los datos del clima se mostrarán al seleccionar una ciudad.</p>
+          <dl class="current-details">
+            <div class="weather-detail">
+              <dt>Temperatura</dt>
+              <dd>—</dd>
+            </div>
+            <div class="weather-detail">
+              <dt>Sensación térmica</dt>
+              <dd>—</dd>
+            </div>
+            <div class="weather-detail">
+              <dt>Condición del cielo</dt>
+              <dd>—</dd>
+            </div>
+            <div class="weather-detail">
+              <dt>Viento</dt>
+              <dd>—</dd>
+            </div>
+            <div class="weather-detail">
+              <dt>Humedad</dt>
+              <dd>—</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="forecast-section panel" aria-labelledby="forecast-title">
+        <div class="section-heading compact-heading">
+          <p class="eyebrow">Próximos días</p>
+          <h2 id="forecast-title">Pronóstico</h2>
+          <p class="section-description">Temperaturas máximas y mínimas de los tres días siguientes.</p>
+        </div>
+        <p class="empty-note">El pronóstico aparecerá al seleccionar una ciudad.</p>
+        <ol class="forecast-list" aria-label="Pronóstico de los tres días posteriores"></ol>
+      </section>
+
+      <section class="favorites-section panel" aria-labelledby="favorites-title">
+        <div class="section-heading compact-heading">
+          <p class="eyebrow">Acceso rápido</p>
+          <h2 id="favorites-title">Ciudades favoritas</h2>
+        </div>
+        <p class="empty-note">Las ciudades que guardes aparecerán aquí.</p>
+        <ul class="favorites-list" aria-label="Ciudades favoritas guardadas"></ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="page-shell">
+        <p>Información meteorológica para planificar tu día.</p>
+      </div>
+    </footer>
+  </body>
+</html>
