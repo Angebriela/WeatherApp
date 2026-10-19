@@ -7,6 +7,10 @@ const resultsSection = document.querySelector(".results-section");
 const resultsList = document.querySelector(".results-list");
 const resultsEmptyNote = resultsSection?.querySelector(".empty-note");
 const selectedLocationLabel = document.querySelector(".location-label");
+const weatherHeading = document.querySelector(".weather-heading");
+const favoriteSaveButton = weatherHeading
+  ? document.createElement("button")
+  : null;
 const currentWeather = document.querySelector(".current-weather");
 const currentWeatherEmptyNote = currentWeather?.querySelector(".empty-note");
 const currentWeatherValues = currentWeather?.querySelectorAll(".weather-detail dd");
@@ -19,6 +23,28 @@ const forecastIncompleteNote = forecastSection
 const favoritesSection = document.querySelector(".favorites-section");
 const favoritesList = document.querySelector(".favorites-list");
 const favoritesEmptyNote = favoritesSection?.querySelector(".empty-note");
+const favoritesErrorNote = favoritesSection
+  ? document.createElement("p")
+  : null;
+
+// Agrega el control para guardar la ciudad elegida sin ampliar el HTML estático.
+if (favoriteSaveButton) {
+  favoriteSaveButton.type = "button";
+  favoriteSaveButton.className = "button favorite-save-button";
+  favoriteSaveButton.dataset.action = "save-favorite";
+  favoriteSaveButton.textContent = "Agregar a favoritas";
+  favoriteSaveButton.hidden = true;
+  weatherHeading.append(favoriteSaveButton);
+}
+
+// Reserva una alerta dentro de la sección de favoritas para fallos de almacenamiento.
+if (favoritesErrorNote) {
+  favoritesErrorNote.className = "favorites-error-message";
+  favoritesErrorNote.setAttribute("role", "alert");
+  favoritesErrorNote.setAttribute("aria-live", "assertive");
+  favoritesErrorNote.hidden = true;
+  favoritesSection.append(favoritesErrorNote);
+}
 
 // Prepara una región accesible para avisar que el pronóstico tiene datos faltantes.
 if (forecastIncompleteNote) {
@@ -70,7 +96,9 @@ export function clearResults() {
 }
 
 // Retira datos meteorológicos anteriores antes de consultar otra ciudad.
-export function clearWeather(message = "Los datos del clima se mostrarán al seleccionar una ciudad.") {
+export function clearWeather(
+  message = "Los datos del clima se mostrarán al seleccionar una ciudad.",
+) {
   currentWeatherValues?.forEach((element) => {
     element.textContent = "—";
   });
@@ -81,7 +109,9 @@ export function clearWeather(message = "Los datos del clima se mostrarán al sel
 }
 
 // Retira el pronóstico anterior y cualquier aviso de datos incompletos.
-export function clearForecast(message = "El pronóstico aparecerá al seleccionar una ciudad.") {
+export function clearForecast(
+  message = "El pronóstico aparecerá al seleccionar una ciudad.",
+) {
   forecastList?.replaceChildren();
   if (forecastEmptyNote) {
     forecastEmptyNote.textContent = message;
@@ -147,16 +177,27 @@ export function setSelectedResult(selectedIndex) {
 
 // Actualiza la etiqueta de ubicación sin solicitar ni presentar datos meteorológicos.
 export function showSelectedCity(city) {
-  if (!selectedLocationLabel) return;
-
   if (!city) {
-    selectedLocationLabel.textContent = "Selecciona una ciudad";
+    if (selectedLocationLabel) selectedLocationLabel.textContent = "Selecciona una ciudad";
+    if (favoriteSaveButton) favoriteSaveButton.hidden = true;
     return;
   }
 
-  selectedLocationLabel.textContent = [city.name, city.admin1, city.country]
-    .filter(Boolean)
-    .join(", ");
+  if (selectedLocationLabel) {
+    selectedLocationLabel.textContent = [city.name, city.admin1, city.country]
+      .filter(Boolean)
+      .join(", ");
+  }
+  if (favoriteSaveButton) favoriteSaveButton.hidden = false;
+}
+
+// Refleja si la ubicación actual ya está guardada y si el almacenamiento permite cambios.
+export function setFavoriteSaveState(isSaved, storageAvailable) {
+  if (!favoriteSaveButton) return;
+
+  favoriteSaveButton.textContent = isSaved ? "Ya está en favoritas" : "Agregar a favoritas";
+  favoriteSaveButton.setAttribute("aria-pressed", String(isSaved));
+  favoriteSaveButton.disabled = isSaved || !storageAvailable;
 }
 
 // Muestra los cinco datos meteorológicos actuales en el orden del HTML.
@@ -209,17 +250,67 @@ export function showForecast(days = [], isIncomplete = false) {
 }
 
 // Renderiza los nombres de favoritas sin gestionar su persistencia ni sus acciones.
-export function showFavorites(favorites = []) {
+export function showFavorites(favorites = [], unavailableMessage = null) {
   if (!favoritesList) return;
 
   favoritesList.replaceChildren();
   const hasFavorites = Array.isArray(favorites) && favorites.length > 0;
-  if (favoritesEmptyNote) favoritesEmptyNote.hidden = hasFavorites;
+  const storageUnavailable = typeof unavailableMessage === "string";
+  if (favoritesEmptyNote) favoritesEmptyNote.hidden = hasFavorites || storageUnavailable;
+  if (favoritesErrorNote) {
+    favoritesErrorNote.textContent = storageUnavailable ? unavailableMessage : "";
+    favoritesErrorNote.hidden = !storageUnavailable;
+  }
+
   if (!hasFavorites) return;
 
-  for (const favorite of favorites) {
+  for (const [index, favorite] of favorites.entries()) {
     const item = document.createElement("li");
-    item.textContent = String(favorite.name ?? "Ciudad favorita");
+    const details = document.createElement("div");
+    const name = document.createElement("strong");
+    const location = document.createElement("span");
+    const coordinates = document.createElement("span");
+    const actions = document.createElement("div");
+    const selectButton = document.createElement("button");
+    const removeButton = document.createElement("button");
+    const locationDetails = [favorite.admin1, favorite.admin2, favorite.country]
+      .filter(Boolean)
+      .join(", ");
+
+    item.className = "favorite-item";
+    details.className = "favorite-details";
+    name.textContent = favorite.name;
+    location.className = "favorite-location";
+    location.textContent = locationDetails || "Región o país no disponible";
+    coordinates.className = "favorite-coordinates";
+    coordinates.textContent = `Coordenadas: ${favorite.latitude}, ${favorite.longitude}`;
+    details.append(name, location, coordinates);
+
+    actions.className = "favorite-actions";
+    selectButton.type = "button";
+    selectButton.className = "button favorite-action-button";
+    selectButton.dataset.favoriteAction = "select";
+    selectButton.dataset.favoriteIndex = String(index);
+    selectButton.textContent = "Consultar";
+    selectButton.setAttribute(
+      "aria-label",
+      `Consultar pronóstico para ${favorite.name}, coordenadas ${favorite.latitude}, ${favorite.longitude}`,
+    );
+    selectButton.disabled = storageUnavailable;
+
+    removeButton.type = "button";
+    removeButton.className = "button favorite-action-button";
+    removeButton.dataset.favoriteAction = "remove";
+    removeButton.dataset.favoriteIndex = String(index);
+    removeButton.textContent = "Quitar";
+    removeButton.setAttribute(
+      "aria-label",
+      `Quitar ${favorite.name}, coordenadas ${favorite.latitude}, ${favorite.longitude}, de favoritas`,
+    );
+    removeButton.disabled = storageUnavailable;
+
+    actions.append(selectButton, removeButton);
+    item.append(details, actions);
     favoritesList.append(item);
   }
 }

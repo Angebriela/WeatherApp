@@ -5,12 +5,20 @@ import { getForecast, searchCities } from "./api.js";
 const searchForm = document.querySelector(".search-form");
 const searchInput = document.querySelector("#city-search");
 const resultsList = document.querySelector(".results-list");
+const favoritesList = document.querySelector(".favorites-list");
+const weatherHeading = document.querySelector(".weather-heading");
 let currentResults = [];
 let selectedCity = null;
+let favorites = [];
+let favoritesAvailable = true;
 let geocodingRequestId = 0;
 let geocodingController = null;
 let forecastRequestId = 0;
 let forecastController = null;
+
+const FAVORITES_STORAGE_KEY = "weather-app:favorites";
+const FAVORITES_UNAVAILABLE_MESSAGE =
+  "No se pueden agregar favoritas por el momento, intentelo mas tarde";
 
 // Traduce las categorías de error del servicio en mensajes útiles para el usuario.
 function getSearchErrorMessage(error) {
@@ -36,6 +44,149 @@ function invalidateForecastRequest() {
   forecastController?.abort();
   forecastController = null;
 }
+
+// Compara ubicaciones por las coordenadas numéricas exactas, no por su nombre.
+function hasSameCoordinates(first, second) {
+  return first.latitude === second.latitude && first.longitude === second.longitude;
+}
+
+// Verifica el esquema persistido y conserva solo los campos usados por la aplicación.
+function validateFavorites(value) {
+  if (!Array.isArray(value)) throw new TypeError("La lista de favoritas no es válida.");
+
+  const validated = [];
+  for (const favorite of value) {
+    if (
+      !favorite
+      || typeof favorite !== "object"
+      || Array.isArray(favorite)
+      || typeof favorite.name !== "string"
+      || !favorite.name.trim()
+      || !Number.isFinite(favorite.latitude)
+      || !Number.isFinite(favorite.longitude)
+      || ["admin1", "admin2", "country"].some((field) => (
+        favorite[field] !== undefined && typeof favorite[field] !== "string"
+      ))
+    ) {
+      throw new TypeError("Una ciudad favorita almacenada no es válida.");
+    }
+
+    const normalizedFavorite = {
+      name: favorite.name,
+      admin1: favorite.admin1 ?? "",
+      admin2: favorite.admin2 ?? "",
+      country: favorite.country ?? "",
+      latitude: favorite.latitude,
+      longitude: favorite.longitude,
+    };
+
+    if (!validated.some((item) => hasSameCoordinates(item, normalizedFavorite))) {
+      validated.push(normalizedFavorite);
+    }
+  }
+
+  return validated;
+}
+
+// Sincroniza la lista y el botón de guardado sin interferir con el flujo meteorológico.
+function renderFavorites() {
+  ui.showFavorites(favorites, favoritesAvailable ? null : FAVORITES_UNAVAILABLE_MESSAGE);
+  ui.setFavoriteSaveState(
+    Boolean(selectedCity && favorites.some((favorite) => hasSameCoordinates(favorite, selectedCity))),
+    favoritesAvailable,
+  );
+}
+
+// Recupera las favoritas al iniciar; errores de acceso o contenido se aíslan aquí.
+function loadFavorites() {
+  try {
+    const storedValue = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    favorites = storedValue === null ? [] : validateFavorites(JSON.parse(storedValue));
+  } catch {
+    favorites = [];
+    favoritesAvailable = false;
+  }
+
+  renderFavorites();
+}
+
+// Persiste primero y solo después actualiza el estado local para no perder datos ante fallos.
+function persistFavorites(nextFavorites) {
+  if (!favoritesAvailable) {
+    renderFavorites();
+    return false;
+  }
+
+  try {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(nextFavorites));
+    favorites = nextFavorites;
+    renderFavorites();
+    return true;
+  } catch {
+    favoritesAvailable = false;
+    renderFavorites();
+    return false;
+  }
+}
+
+// Guarda una copia mínima de la ciudad seleccionada, conservando sus coordenadas originales.
+function createFavorite(city) {
+  return {
+    name: city.name,
+    admin1: city.admin1 ?? "",
+    admin2: city.admin2 ?? "",
+    country: city.country ?? "",
+    latitude: city.latitude,
+    longitude: city.longitude,
+  };
+}
+
+// Agrega la ubicación actual solo si no existe ya la misma pareja de coordenadas.
+function saveSelectedCityAsFavorite() {
+  if (!selectedCity || !favoritesAvailable) {
+    renderFavorites();
+    return;
+  }
+
+  if (favorites.some((favorite) => hasSameCoordinates(favorite, selectedCity))) {
+    renderFavorites();
+    return;
+  }
+
+  if (persistFavorites([...favorites, createFavorite(selectedCity)])) {
+    ui.showMessage(`${selectedCity.name} se agregó a favoritas.`);
+  }
+}
+
+// Consulta o elimina la favorita indicada; la persistencia fallida no afecta otras funciones.
+function handleFavoriteAction(event) {
+  const button = event.target.closest("[data-favorite-action]");
+  if (!button) return;
+
+  const index = Number(button.dataset.favoriteIndex);
+  if (!Number.isInteger(index) || !favorites[index] || !favoritesAvailable) return;
+
+  if (button.dataset.favoriteAction === "remove") {
+    const removedFavorite = favorites[index];
+    const nextFavorites = favorites.filter((_, favoriteIndex) => favoriteIndex !== index);
+    if (persistFavorites(nextFavorites) && removedFavorite) {
+      ui.showMessage(`${removedFavorite.name} se quitó de favoritas.`);
+    }
+    return;
+  }
+
+  if (button.dataset.favoriteAction === "select") {
+    selectedCity = favorites[index];
+    ui.setSelectedResult(-1);
+    ui.showSelectedCity(selectedCity);
+    renderFavorites();
+    ui.showMessage(`Ciudad favorita seleccionada: ${selectedCity.name}.`);
+    void loadSelectedCityForecast(selectedCity);
+  }
+}
+
+// Carga los datos guardados antes de habilitar acciones de favoritas.
+loadFavorites();
 
 // Traduce los códigos WMO recibidos por Open-Meteo a descripciones en español.
 const WEATHER_DESCRIPTIONS = {
@@ -195,6 +346,7 @@ if (searchForm && searchInput) {
     ui.clearWeather();
     ui.clearForecast();
     ui.showSelectedCity(null);
+    ui.setFavoriteSaveState(false, favoritesAvailable);
     ui.setSearchInvalid(false);
     ui.setLoading(true, "Buscando ciudades…");
 
@@ -239,6 +391,10 @@ if (searchForm && searchInput) {
     selectedCity = currentResults[resultIndex];
     ui.setSelectedResult(resultIndex);
     ui.showSelectedCity(selectedCity);
+    ui.setFavoriteSaveState(
+      favorites.some((favorite) => hasSameCoordinates(favorite, selectedCity)),
+      favoritesAvailable,
+    );
     ui.showMessage(
       `Ciudad seleccionada: ${[selectedCity.name, selectedCity.admin1, selectedCity.country]
         .filter(Boolean)
@@ -249,3 +405,12 @@ if (searchForm && searchInput) {
 } else {
   ui.showError("No se encontró el formulario de búsqueda en la página.");
 }
+
+// Registra eventos de favoritas después de que sus controles estén renderizados.
+weatherHeading?.addEventListener("click", (event) => {
+  if (event.target.closest('[data-action="save-favorite"]')) {
+    saveSelectedCityAsFavorite();
+  }
+});
+
+favoritesList?.addEventListener("click", handleFavoriteAction);
