@@ -1,0 +1,27 @@
+# Dependencias
+
+
+# Archivos generados
+dist/
+build/
+coverage/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Registros
+*.log
+
+# Archivos temporales
+*.tmp
+*.swp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
